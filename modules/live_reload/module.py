@@ -35,8 +35,7 @@ def get_latest_mtime(directory="src"):
     return latest
 
 
-def handle_request(path):
-    """Intercepts the /_live_reload polling route."""
+def handle_request(path, raw_request=None, address=None):
     if path == "/_live_reload":
         latest = str(get_latest_mtime())
         return (
@@ -44,6 +43,7 @@ def handle_request(path):
             + latest.encode()
         )
     return None
+
 
 
 def transform_response(content):

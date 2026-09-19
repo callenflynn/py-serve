@@ -38,7 +38,7 @@ def handle_client(client, address):
     # Check if a module handles this specific request path 
     for module in active_modules:
         if hasattr(module, "handle_request"):
-            module_response = module.handle_request(path)
+            module_response = module.handle_request(path, raw_request, address)
             if module_response:
                 client.sendall(module_response)
                 client.close()
