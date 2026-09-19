@@ -1,13 +1,59 @@
+import importlib
+import json
 import socket
 import threading
 
 
-def handle_client(client):
-    client.recv(1024)
+def get_active_modules():
+    try:
+        with open("settings.json", "r") as f:
+            settings = json.load(f)
+    except FileNotFoundError:
+        return []
 
+    active = []
+    for mod_name, enabled in settings.get("modules", {}).items():
+        if enabled:
+            try:
+                module = importlib.import_module(f"modules.{mod_name}.module")
+                active.append(module)
+            except ModuleNotFoundError:
+                print(f"[WARN] Could not find modules/{mod_name}/module.py")
+    return active
+
+
+def handle_client(client, address):
+    active_modules = get_active_modules()
+
+    # Trigger passive background modules (like telemetry)
+    for module in active_modules:
+        if hasattr(module, "run"):
+            module.run(address[0])
+
+    raw_request = client.recv(1024).decode("utf-8", errors="ignore")
+    first_line = raw_request.split("\r\n")[0] if raw_request else ""
+    parts = first_line.split(" ")
+    path = parts[1] if len(parts) > 1 else "/"
+
+    # Check if a module handles this specific request path (e.g. /_live_reload)
+    for module in active_modules:
+        if hasattr(module, "handle_request"):
+            module_response = module.handle_request(path)
+            if module_response:
+                client.sendall(module_response)
+                client.close()
+                return
+
+    # Default file serving logic
     try:
         with open("src/index.html", "rb") as f:
             content = f.read()
+
+        # Allow modules to modify response content (e.g., inject JS)
+        for module in active_modules:
+            if hasattr(module, "transform_response"):
+                content = module.transform_response(content)
+
         response = (
             b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + content
         )
@@ -26,5 +72,7 @@ server.listen(5)
 print("Server started on port 8000")
 
 while True:
-    client, _ = server.accept()
-    threading.Thread(target=handle_client, args=(client,), daemon=True).start()
+    client, address = server.accept()
+    threading.Thread(
+        target=handle_client, args=(client, address), daemon=True
+    ).start()
