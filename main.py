@@ -25,7 +25,7 @@ def get_active_modules():
 def handle_client(client, address):
     active_modules = get_active_modules()
 
-    # Trigger passive background modules (like telemetry)
+
     for module in active_modules:
         if hasattr(module, "run"):
             module.run(address[0])
@@ -35,7 +35,7 @@ def handle_client(client, address):
     parts = first_line.split(" ")
     path = parts[1] if len(parts) > 1 else "/"
 
-    # Check if a module handles this specific request path (e.g. /_live_reload)
+    # Check if a module handles this specific request path 
     for module in active_modules:
         if hasattr(module, "handle_request"):
             module_response = module.handle_request(path)
@@ -44,12 +44,12 @@ def handle_client(client, address):
                 client.close()
                 return
 
-    # Default file serving logic
+    # default file serving logic
     try:
         with open("src/index.html", "rb") as f:
             content = f.read()
 
-        # Allow modules to modify response content (e.g., inject JS)
+        # let modules modify content
         for module in active_modules:
             if hasattr(module, "transform_response"):
                 content = module.transform_response(content)
